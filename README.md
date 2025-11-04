@@ -5,48 +5,42 @@ README — Monitoramento de Clima com FIWARE
  Gustavo Mendez rm 563753
  Enrico Almeida rm 563265
 
-🎯 Visão Geral
 
-Este projeto conecta um dispositivo IoT (como um sensor de temperatura, umidade ou potenciômetro) ao FIWARE, permitindo:
+Requisitos rápidos
 
-📡 Coletar dados em tempo real via IoT-Agent.
+ 1 Acesso ao servidor FIWARE (Orion Context Broker, IoT-Agent, STH-Comet, etc.).
 
-💾 Armazenar e consultar informações com o Orion Context Broker.
+ 2 Ferramenta para fazer requisições HTTP (ex.: curl, Postman).
 
-📈 Visualizar medições e histórico com o STH-Comet e uma interface web interativa.
-
-Tudo isso forma uma solução prática de monitoramento climático com arquitetura FIWARE.
-
-🧭 Arquitetura do Sistema
-[Sensor IoT] → [IoT-Agent] → [Orion Context Broker] → [STH-Comet]
-       ↓                                      ↑
-        └──────────── Interface Web (HTML + Chart.js) ─────────────┘
+ 3 Ter o device_id e os atributos do seu dispositivo (por ex.: p para potenciômetro).
 
 
-IoT-Agent: Traduz os dados enviados pelo sensor para o FIWARE.
 
-Orion: Armazena e disponibiliza os valores atuais.
 
-STH-Comet: Mantém o histórico das leituras.
+Resumo dos passos (o que você vai fazer)
 
-Interface Web: Mostra os valores e gráficos em tempo real.
+ 1 Provisionar (configurar) o dispositivo no IoT-Agent — dizer ao FIWARE quais atributos o dispositivo tem.
 
-⚙️ Pré-requisitos
+ 2 Registrar comandos no Orion — configurar notificações/ações para o dispositivo.
 
-Acesso ao FIWARE Orion Context Broker, IoT-Agent e STH-Comet.
+ 3 Listar dispositivos provisionados — checar se ficou tudo certo.
 
-Ferramenta para chamadas HTTP (ex.: Postman, Insomnia ou curl).
+ 4 Ler um atributo no Orion — pedir o valor atual (ex.: valor do potenciômetro).
 
-Servidor configurado com IP acessível (http://44.223.0.185 no exemplo).
+ 5 (Se precisar) Deletar o dispositivo — remover do IoT-Agent e do Orion.
 
-Um dispositivo com ID único e atributos definidos (ex.: p para potenciômetro).
+ 6 Assinar notificações para STH-Comet — mandar mudanças para o histórico temporal.
 
-🚀 Etapas de Configuração
-1️⃣ Provisionar o Dispositivo (IoT-Agent)
+ 7 Pedir série temporal no STH-Comet — consultar histórico (últimos N pontos).
 
-Cria-se o registro do sensor no FIWARE, informando atributos e comandos disponíveis.
 
-Requisição:
+
+
+Passo 1 — Provisionar o dispositivo (IoT-Agent)
+
+O que é: dizer ao IoT-Agent como é seu dispositivo (ID, atributos, comandos, protocolo).
+
+JSON de exemplo — adapte as partes destacadas (id, atributos, protocolo, transport):
 
 {
   "devices": [
@@ -68,17 +62,18 @@ Requisição:
   ]
 }
 
+O que mudar: coloque o device_id do seu dispositivo e os attributes corretos (Text, Integer, Float, etc.).
 
-Enviar para:
-POST http://{{url}}:4041/iot/devices
+Resultado esperado: o IoT-Agent responde confirmando que o dispositivo foi criado.
 
-Retorno esperado: Confirmação de criação (201 Created).
 
-2️⃣ Registrar no Orion Context Broker
 
-Informa ao Orion que este dispositivo existe e que ele deve aceitar comandos vindos da aplicação.
 
-Requisição:
+Passo 2 — Registrar comandos no Orion
+
+O que é: criar um subscription/registro para os comandos (por exemplo, on e off) que chegam da aplicação.
+
+JSON de exemplo:
 
 {
   "description": "device Commands",
@@ -94,109 +89,152 @@ Requisição:
   }
 }
 
-3️⃣ Verificar Dispositivos Provisionados
+O que mudar: coloque a id/type do seu dispositivo e a url do serviço que receberá notificações.
 
-Confirme se o IoT-Agent registrou o dispositivo corretamente:
-GET http://{{url}}:4041/iot/devices
-
-Você deve ver o device_id e os atributos listados.
-
-4️⃣ Consultar Valor do Sensor
-
-Para visualizar o valor atual de um atributo (ex.: p — potenciômetro):
-
-GET http://{{url}}:1026/v2/entities/urn:ngsi-ld:device:001/attrs/p
+Resultado esperado: Orion aceita o registro e encaminhará eventos ao provider.
 
 
-Retorno exemplo:
 
-{ "value": 47 }
 
-5️⃣ (Opcional) Remover o Dispositivo
+Passo 3 — Listar devices provisionados (verificar)
 
-Para excluir o dispositivo do IoT-Agent e do Orion:
+O que é: pedir ao IoT-Agent a lista de devices cadastrados para confirmar se o seu dispositivo apareceu com os atributos corretos.
 
-DELETE http://{{url}}:4041/iot/devices/device001
-DELETE http://{{url}}:1026/v2/entities/urn:ngsi-ld:device:001
+Como fazer: usar a API do IoT-Agent (ex.: via navegador ou curl) para listar devices.
+O que procurar: device_id, entity_name, attributes — tudo deve corresponder ao que você enviou.
 
-6️⃣ Criar Assinatura para Histórico (STH-Comet)
 
-Permite que o Orion envie notificações ao STH-Comet sempre que o valor p mudar.
 
+Passo 4 — Ler um atributo no Orion
+
+O que é: pedir ao Orion o valor atual de um atributo (ex.: p — potenciômetro).
+
+Exemplo de URL (GET): http://{{url}}:1026/v2/entities/urn:ngsi-ld:device:001/attrs/p
+
+O que você receberá: um JSON com o valor atual do atributo p.
+Ex.: { "value": 42 } (dependendo do formato do seu IoT-Agent, pode ter pequenas diferenças).
+
+
+
+
+Passo 5 — Deletar dispositivo (se necessário)
+
+Se quiser remover o dispositivo do sistema:
+
+ 1 Deletar no IoT-Agent (remove o provisioning):   http://{{url}}:4041/iot/devices/device001
+ 
+ 2 Deletar no Orion (remove a entidade/declaracão):  http://{{url}}:1026/v2/entities/urn:ngsi-ld:device:001
+
+Observação: sempre confirme com GETs antes/depois para garantir que foi removido.
+
+
+
+Passo 6 — Assinar notificações para STH-Comet (Salvar histórico)
+
+O que é: criar uma subscription no Orion que notifica o STH-Comet quando o atributo p mudar — assim o STH grava a série temporal.
+
+JSON de exemplo:
 {
-  "description": "Notify STH-Comet of Potentiometer changes",
+  "description": "Notify STH-Comet of all Motion Sensor count changes",
   "subject": {
     "entities": [
-      { "id": "urn:ngsi-ld:device:001", "type": "device" }
+      {
+        "id": "urn:ngsi-ld:device:001",
+        "type": "device"
+      }
     ],
     "condition": { "attrs": ["p"] }
   },
   "notification": {
-    "http": { "url": "http://{{url}}:8666/notify" },
-    "attrs": ["p"],
+    "http": {
+      "url": "http://{{url}}:8666/notify"
+    },
+    "attrs": [ "p" ],
     "attrsFormat": "legacy"
   }
 }
+O que mudar: id, type, attrs e url do STH-Comet.
 
-7️⃣ Consultar Histórico no STH-Comet
-
-Para ver os últimos valores registrados:
-
-GET http://{{url}}:8666/STH/v1/contextEntities/type/device/id/urn:ngsi-ld:device:001/attributes/p?lastN=30
+Resultado esperado: STH-Comet será notificado e começará a guardar as leituras de p.
 
 
-Retorna as últimas 30 medições.
-
-💻 Interface Web (Monitoramento de Clima)
-
-A página HTML usa Chart.js para exibir dois gráficos:
-
-📈 Gráfico 1: Variação do potenciômetro ao longo do tempo.
-
-📊 Gráfico 2: Resumo estatístico (mínimo, médio, máximo).
-
-Exemplo visual (simulação):
-
-╔════════════════════════════════════════════════╗
-║ 🌦️ Monitoramento de Clima                     ║
-╠════════════════════════════════════════════════╣
-║ Potenciômetro: [ 45 ]                         ║
-║                                                ║
-║ 📈 Variação ao longo do tempo                 ║
-║ 📊 Resumo das leituras                        ║
-╚════════════════════════════════════════════════╝
 
 
-🔁 O sistema atualiza automaticamente a cada 5 segundos.
-💡 O botão do potenciômetro é interativo e responsivo.
+Passo 7 — Solicitar série temporal no STH-Comet
 
-🧩 Glossário Simplificado
-Termo	Descrição
-IoT-Agent	Responsável por traduzir dados dos dispositivos para o FIWARE.
-Orion Context Broker	Armazena e distribui os dados em tempo real.
-STH-Comet	Mantém o histórico (séries temporais) das medições.
-Entidade (Entity)	Representação lógica do dispositivo dentro do FIWARE.
-Atributo (Attribute)	Valor variável do dispositivo (ex.: temperatura, p).
-🔍 Dicas Práticas
+O que é: pedir os últimos N pontos do atributo p que o STH armazenou.
 
-Substitua {{url}} pelo IP ou domínio do seu servidor FIWARE.
+Exemplo de URL:  http://{{url}}:8666/STH/v1/contextEntities/type/device/id/urn:ngsi-ld:device:001/attributes/p?lastN=30
 
-Cada dispositivo precisa de um ID único.
+O que isso pede: os últimos 30 valores registrados para p. A resposta vem em JSON com a série temporal.
 
-Se algo falhar, verifique logs do IoT-Agent e Orion.
 
-Teste primeiro com lastN=5 para validar o histórico.
 
-Use Postman para facilitar os testes de requisições.
+Glossário simples
 
-🏁 Resultado Final
+ 1 IoT-Agent: “intérprete” que conhece seu tipo de dispositivo e converte mensagens para o FIWARE.
 
-Ao concluir todas as etapas, você terá:
+ 2 Orion Context Broker: guarda o estado atual das entidades (por exemplo, o valor atual do potenciômetro).
 
-O painel web exibindo as medições em tempo real.
+ 3 STH-Comet: guarda o histórico (séries temporais) das medições.
 
-O Orion registrando os valores atuais.
+ 4 Provisionar: cadastrar / registrar um dispositivo no IoT-Agent.
 
-O STH-Comet armazenando o histórico.
+ 5 Entity (entidade): representação do dispositivo no Orion (ex.: urn:ngsi-ld:device:001).
 
-Tudo funcionando de forma integrada, representando um sistema completo de monitoramento climático com FIWARE. 🌎
+ 6 Attribute (atributo): uma característica que pode mudar (ex.: p, state).
+
+
+
+Dicas fáceis (para evitar problemas)
+
+ 1 Sempre troque {{url}} pelo endereço correto.
+
+ 2 Use device_id único para cada dispositivo.
+
+ 3 Se a API pedir autenticação, coloque as credenciais corretamente.
+
+ 4 Se um passo der erro, copie a mensagem de erro — ela ajuda a descobrir o problema.
+
+ 5 Teste primeiro com poucos pontos (lastN=5) para ver se os dados aparecem.
+
+
+ 
+
+Problemas comuns & soluções rápidas
+
+ 1 Resposta vazia ao pedir atributo: verifique se o dispositivo está devidamente provisionado e se o IoT-Agent está recebendo mensagens.
+
+ 2 STH não mostra histórico: confira se a subscription aponta corretamente para http://{{url}}:8666/notify.
+
+ 3 Erro 404 ao deletar: confirme o device_id e a URL (porta e caminho).
+
+ 4 Dados com formato inesperado: verifique o type dos atributos no provisioning (Integer, Float, Text).
+
+
+
+
+Final (resumindo)
+
+ 1 Provisionar no IoT-Agent (dizer como é o device).
+
+ 2 Registrar no Orion (commands/subscriptions).
+
+ 3 Verificar (listar devices).
+
+ 4 Ler atributos no Orion.
+
+ 5 Deletar quando necessário (IoT-Agent e Orion).
+
+ 6 Assinar mudanças para o STH-Comet (guardar histórico).
+
+ 7 Pedir séries temporais ao STH-Comet.
+
+<img width="1505" height="919" alt="image" src="https://github.com/user-attachments/assets/4eb3b1ae-b9c4-417d-a8a7-b278bea18755" />
+
+
+
+
+
+
+ 
